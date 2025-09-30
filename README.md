@@ -24,3 +24,6 @@ website
 
 ### 📜 Changelog Sentinel
 [![Changelog Sentinel](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/changelog-sentinel.yml/badge.svg)](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/changelog-sentinel.yml)
+
+### 🧙 Dependency Dowsing
+[![Dependency Dowsing](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/dependency-dowsing.yml/badge.svg)](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/dependency-dowsing.yml)
