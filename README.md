@@ -27,3 +27,9 @@ website
 
 ### 🧙 Dependency Dowsing
 [![Dependency Dowsing](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/dependency-dowsing.yml/badge.svg)](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/dependency-dowsing.yml)
+
+### 🧾 README Ritualizer
+[![README Ritualizer](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/readme-ritualizer.yml/badge.svg)](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/readme-ritualizer.yml)
+
+### 🛰️ CI Artifact Sentinel
+[![CI Artifact Sentinel](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/ci-artifact-sentinel.yml/badge.svg)](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/ci-artifact-sentinel.yml)
