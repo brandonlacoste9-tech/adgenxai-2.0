@@ -20,4 +20,7 @@ website
 [![Contributor Beacon](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/contributor-beacon.yml/badge.svg)](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/contributor-beacon.yml)
 
 ### ❤️ Hive Heartbeat
-[![Hive Heartbeat](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/hive-heartbeat.yml/badge.svg)](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/hive-heartbeat.yml).
+[![Hive Heartbeat](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/hive-heartbeat.yml/badge.svg)](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/hive-heartbeat.yml)
+
+### 📜 Changelog Sentinel
+[![Changelog Sentinel](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/changelog-sentinel.yml/badge.svg)](https://github.com/brandonlacoste9-tech/adgenxai-2.0/actions/workflows/changelog-sentinel.yml)
