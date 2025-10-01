@@ -1,0 +1,86 @@
+name: Repo Maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        description: "Task to run"
+        options: [enforce, sync]
+        default: enforce
+      dry_run:
+        type: boolean
+        description: "Preview only (no changes) — enforce mode"
+        default: false
+      pr_number:
+        type: number
+        description: "PR to comment on (enforce mode)"
+        default: 23
+  schedule:
+    - cron: "30 2 * * *"   # nightly enforce (02:30 UTC)
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - "README.md"
+      - "docs/SECURITY_AUTOMATION.md"
+      - ".github/workflows/maintenance.yml"
+      - ".github/workflows/enforce-codex-protection.yml"
+      - ".github/workflows/sync-readme-badges.yml"
+      - "scripts/maint/**"
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # For cron and push we operate on main; for manual we'll let scripts switch as needed
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.ref || 'main' }}
+          fetch-depth: 0
+
+      - name: Tools
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y jq ripgrep
+          gh --version || true
+          chmod +x scripts/maint/enforce_strict_and_comment.sh || true
+          chmod +x scripts/maint/sync_readme_badges.sh || true
+
+      - name: Run enforce (strict + protection)
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'enforce') }}
+        env:
+          OWNER: brandonlacoste9-tech
+          REPO: adgenxai-2.0
+          # Skip PR comment on cron/push; use provided PR for manual runs
+          PR_NUMBER: ${{ github.event_name == 'schedule' && 0 || (github.event_name == 'push' && 0 || inputs.pr_number) }}
+          DOCS_BRANCH: ${{ github.event_name == 'schedule' && 'main' || 'docs/security-automation-guide' }}
+          BASE_BRANCH: main
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${PR_NUMBER:-0}" = "0" ]; then
+            # Patch function to no-op PR commenting for non-manual runs
+            sed 's/^comment_on_pr() {.*/comment_on_pr() { echo "Skip PR comment (no PR)."; return; } #/' \
+              scripts/maint/enforce_strict_and_comment.sh > /tmp/enforce.sh
+            bash /tmp/enforce.sh
+          else
+            bash scripts/maint/enforce_strict_and_comment.sh
+          fi
+
+      - name: Run sync (badges on main)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'sync' }}
+        env:
+          OWNER: brandonlacoste9-tech
+          REPO: adgenxai-2.0
+          BASE_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git switch main
+          bash scripts/maint/sync_readme_badges.sh
