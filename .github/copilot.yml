@@ -1,0 +1,7 @@
+# GitHub Copilot Configuration for adgenxai-2.0
+copilot:
+  instructions:
+    - "This repo contains bash automation scripts in /scripts directory for repository hygiene monitoring."
+    - "The update_hygiene.sh script checks for PRs with 'hygiene-failed' label and creates/updates issues, discussions, and a badge JSON file."
+    - "CI workflows live in .github/workflows - currently contains a basic blank.yml workflow template."
+    - "The hygiene script uses GitHub CLI (gh) to interact with issues, PRs, and discussions, and pushes status to a separate hygiene-badge branch."
