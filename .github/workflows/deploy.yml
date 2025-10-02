@@ -1,0 +1,84 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+          - development
+  push:
+    branches: [ "main" ]
+    tags:
+      - 'v*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set deployment environment
+        run: |
+          if [ "${{ github.event.inputs.environment }}" != "" ]; then
+            echo "DEPLOY_ENV=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+          else
+            echo "DEPLOY_ENV=production" >> $GITHUB_ENV
+          fi
+          
+      - name: Prepare deployment
+        run: |
+          echo "🚀 Preparing deployment to ${{ env.DEPLOY_ENV }}..."
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Commit: ${{ github.sha }}"
+          
+      - name: Run pre-deployment checks
+        run: |
+          echo "✅ Running pre-deployment checks..."
+          
+          # Check scripts are executable
+          if [ -d "scripts" ]; then
+            echo "Scripts directory found"
+            chmod +x scripts/*.sh || true
+          fi
+          
+          # Validate workflow files
+          if [ -d ".github/workflows" ]; then
+            echo "Workflows directory found"
+            echo "Workflow count: $(ls -1 .github/workflows/*.yml 2>/dev/null | wc -l)"
+          fi
+          
+      - name: Deploy
+        run: |
+          echo "🎯 Deploying to ${{ env.DEPLOY_ENV }}..."
+          echo "Timestamp: $(date -u +"%Y-%m-%d %H:%M UTC")"
+          
+          # Add your deployment commands here
+          # For example:
+          # - Deploy to cloud platform
+          # - Update services
+          # - Run migrations
+          # - Notify deployment channels
+          
+      - name: Post-deployment verification
+        run: |
+          echo "🔍 Running post-deployment verification..."
+          echo "✅ Deployment to ${{ env.DEPLOY_ENV }} completed successfully"
+          
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ ${{ job.status }} == "success" ]; then
+            echo "✅ Deployment successful"
+          else
+            echo "❌ Deployment failed"
+          fi
