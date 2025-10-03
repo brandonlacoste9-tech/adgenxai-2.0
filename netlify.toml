@@ -1,0 +1,20 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Security headers for every path
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options    = "nosniff"
+    Permissions-Policy        = "geolocation=(), microphone=(), camera=()"
+    Referrer-Policy           = "strict-origin-when-cross-origin"
+
+# Apex → www, host-gated (no loops)
+[[redirects]]
+  from = "/*"
+  to   = "https://www.adgenxai.com/:splat"
+  status = 301
+  force  = true
+  conditions = { Host = ["adgenxai.com"] }
