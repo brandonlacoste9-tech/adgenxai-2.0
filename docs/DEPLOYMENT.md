@@ -62,6 +62,47 @@ Builds multi-architecture Docker images.
 - Optional Docker Hub push (requires secrets)
 - Build caching for faster builds
 
+### 5. Repository Security Audit (`repo-audit.yml`)
+Comprehensive security scanning for vulnerabilities and exposed secrets.
+
+**Triggers:**
+- Pull requests to `main` or `develop` branches
+- Weekly schedule (Mondays at 2 AM UTC)
+- Manual dispatch
+
+**Features:**
+- Scans for hardcoded secrets and credentials
+- Analyzes commit history for suspicious patterns
+- Audits CI/CD workflow configurations
+- Detects suspicious code execution patterns
+- Checks dependency vulnerabilities
+- Generates detailed audit report artifact
+
+**Purpose:**
+Post-compromise safety measure to detect secrets, suspicious patterns, and security misconfigurations early.
+
+**Manual Trigger:**
+Go to Actions → Repository Security Audit → Run workflow
+
+**Artifact:**
+Each run produces a `repo-audit-report` artifact containing detailed findings. Download from the workflow run page.
+
+**Documentation:**
+See `docs/SECURITY.md` for complete security audit documentation.
+- Push to `main` branch
+- Version tags (v*)
+- Pull requests to `main`
+
+**Platforms:**
+- linux/amd64
+- linux/arm64
+
+**Features:**
+- QEMU setup for cross-platform builds
+- Docker Buildx for multi-arch support
+- Optional Docker Hub push (requires secrets)
+- Build caching for faster builds
+
 ## Configuration
 
 ### Docker Hub Authentication (Optional)
