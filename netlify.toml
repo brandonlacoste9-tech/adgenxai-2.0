@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build"
+  command = "bash scripts/build-static.sh"
   publish = "dist"
 
 # Security headers for every path
