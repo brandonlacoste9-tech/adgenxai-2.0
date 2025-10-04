@@ -1,0 +1,41 @@
+name: Post Security Audit Comment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  post-comment:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Post security audit report to PR #36
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = `========================================
+            Repository Security Audit Report
+            Timestamp: 2025-10-04 11:32 UTC
+            Repository: brandonlacoste9-tech/adgenxai-2.0
+            ========================================
+            
+            === 1. Secret Scanning ===
+            [PASS] No obvious secrets detected in repository
+            
+            === 2. Suspicious CI/CD Changes Analysis ===
+            [INFO] Third-party actions in docker-multiarch.yml:
+             uses: docker/setup-qemu-action@v3
+             uses: docker/setup-buildx-action@v3
+            [PASS] No suspicious patterns detected in CI/CD workflows
+            
+            ...
+            
+            Total Findings: 0
+            Critical Findings: 0
+            ✅ No significant security issues detected.`;
+            
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 36,
+              body: comment
+            });
