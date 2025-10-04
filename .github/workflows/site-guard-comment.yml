@@ -1,0 +1,71 @@
+name: site-guard-comment
+on:
+  pull_request:
+    paths:
+      - "**/*.html"
+      - "public/**"
+      - "scripts/**"
+      - ".github/workflows/site-guard-comment.yml"
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compute changed/added files
+        id: diff
+        run: |
+          git diff --name-only ${{ github.event.pull_request.base.sha }}...${{ github.sha }} > changed.txt
+          git diff --diff-filter=A --name-only ${{ github.event.pull_request.base.sha }}...${{ github.sha }} > added.txt
+          echo "Changed files:" && cat changed.txt || true
+          echo "Added files:" && cat added.txt || true
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Run soft guard
+        id: guard
+        run: |
+          python3 scripts/check_site.py | tee guard_output.txt
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo '```' >> $GITHUB_OUTPUT
+          cat guard_output.txt >> $GITHUB_OUTPUT
+          echo '```' >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Post/Update PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const header = "### 🔍 Site Guard (soft) — canonical / sitemap / OG\n";
+            const markerStart = "<!-- site-guard:begin -->";
+            const markerEnd   = "<!-- site-guard:end -->";
+            const body = `${header}\n${markerStart}\n${process.env.SUMMARY}\n${markerEnd}\n` ;
+            const { owner, repo, number } = context.issue;
+            const { data: comments } = await github.rest.issues.listComments({ owner, repo, issue_number: number, per_page: 100 });
+            const mine = comments.find(c =>
+              c.user?.type === "Bot" &&
+              c.body?.includes(markerStart) &&
+              c.body?.includes(markerEnd)
+            );
+            if (mine) {
+              const newBody = mine.body.replace(
+                new RegExp(`${markerStart}[\s\S]*${markerEnd}`),
+                `${markerStart}\n${process.env.SUMMARY}\n${markerEnd}`
+              );
+              await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body: newBody });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: number, body });
+            }
+        env:
+          SUMMARY: ${{ steps.guard.outputs.summary }}
+      - name: Job Summary
+        run: |
+          echo "### 🔍 Site Guard (soft)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat guard_output.txt >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
