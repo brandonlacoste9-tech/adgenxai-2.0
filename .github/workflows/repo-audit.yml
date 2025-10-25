@@ -1,0 +1,177 @@
+name: Repository Security Audit
+
+on:
+  # Run on pull requests to catch issues before merge
+  pull_request:
+    branches: [ "main", "develop" ]
+  
+  # Weekly scheduled scan
+  schedule:
+    - cron: '0 2 * * 1'  # Every Monday at 2 AM UTC
+  
+  # Allow manual triggering
+  workflow_dispatch:
+    inputs:
+      commit_limit:
+        description: 'Number of recent commits to analyze'
+        required: false
+        default: '50'
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      security-events: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for comprehensive audit
+      
+      - name: Setup audit environment
+        run: |
+          echo "🔒 Setting up security audit environment..."
+          
+          # Install dependencies
+          if [ -f "package.json" ]; then
+            echo "Installing npm dependencies for audit..."
+            npm ci --prefer-offline --no-audit 2>/dev/null || npm install --prefer-offline --no-audit || true
+          fi
+          
+          # Ensure jq is available for JSON parsing
+          sudo apt-get update -qq
+          sudo apt-get install -y jq
+      
+      - name: Run security audit
+        id: audit
+        continue-on-error: true
+        env:
+          COMMIT_LIMIT: ${{ github.event.inputs.commit_limit || '50' }}
+        run: |
+          echo "🔍 Running comprehensive security audit..."
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Triggered by: ${{ github.event_name }}"
+          echo ""
+          
+          # Make script executable
+          chmod +x tools/repo-audit.sh
+          
+          # Run the audit script
+          bash tools/repo-audit.sh || echo "audit_failed=true" >> $GITHUB_OUTPUT
+      
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-audit-report
+          path: repo-audit-report.txt
+          retention-days: 90
+      
+      - name: Check audit results
+        if: always()
+        run: |
+          echo "📊 Audit Results Summary"
+          echo "======================="
+          
+          if [ -f "repo-audit-report.txt" ]; then
+            # Extract summary section
+            echo ""
+            echo "Findings:"
+            grep -A 10 "FINDINGS SUMMARY:" repo-audit-report.txt || true
+            echo ""
+            
+            # Check if critical/high issues found
+            if grep -q "\[CRITICAL\]" repo-audit-report.txt || grep -q "\[HIGH\]" repo-audit-report.txt; then
+              echo "::error::Critical or high severity security issues detected! Review the audit report artifact."
+              echo ""
+              echo "⚠️  IMMEDIATE ACTION REQUIRED ⚠️"
+              echo "1. Download and review the audit report artifact"
+              echo "2. Rotate all potentially compromised credentials"
+              echo "3. Review recent commits and workflow changes"
+              echo "4. Check GitHub settings for unknown SSH keys and OAuth apps"
+              echo ""
+              exit 1
+            else
+              echo "✅ No critical or high severity issues detected"
+            fi
+          else
+            echo "::warning::Audit report not generated"
+          fi
+      
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            if (!fs.existsSync('repo-audit-report.txt')) {
+              console.log('No audit report found');
+              return;
+            }
+            
+            const report = fs.readFileSync('repo-audit-report.txt', 'utf8');
+            
+            // Extract summary
+            const summaryMatch = report.match(/FINDINGS SUMMARY:[\s\S]*?(?=\n\n|$)/);
+            const summary = summaryMatch ? summaryMatch[0] : 'Summary not available';
+            
+            // Check for critical/high issues
+            const hasCritical = report.includes('[CRITICAL]');
+            const hasHigh = report.includes('[HIGH]');
+            
+            const icon = (hasCritical || hasHigh) ? '🚨' : '✅';
+            const status = (hasCritical || hasHigh) ? 'Issues Detected' : 'Passed';
+            
+            const body = `## ${icon} Security Audit ${status}
+            
+            ${summary}
+            
+            ${hasCritical || hasHigh ? 
+              '⚠️ **Action Required**: Critical or high severity issues detected. Please review the [audit report artifact](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).' : 
+              '✅ No critical or high severity issues detected.'}
+            
+            ---
+            <details>
+            <summary>View audit details</summary>
+            
+            - **Triggered by**: ${context.eventName}
+            - **Branch**: ${context.ref}
+            - **Commit**: ${context.sha.substring(0, 7)}
+            - **Run ID**: ${context.runId}
+            
+            Download the full report from the workflow artifacts for detailed findings.
+            </details>
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+      
+      - name: Security recommendations
+        if: always()
+        run: |
+          echo ""
+          echo "📋 Security Best Practices Reminder:"
+          echo "===================================="
+          echo "1. ✅ Rotate credentials regularly"
+          echo "2. ✅ Use GitHub Secrets for sensitive data"
+          echo "3. ✅ Enable GitHub secret scanning alerts"
+          echo "4. ✅ Enable Dependabot security updates"
+          echo "5. ✅ Review workflow permissions regularly"
+          echo "6. ✅ Enable 2FA on all accounts"
+          echo "7. ✅ Audit SSH keys and OAuth apps periodically"
+          echo ""
+          echo "🔗 Useful links:"
+          echo "- GitHub Security Settings: https://github.com/settings/security"
+          echo "- SSH Keys: https://github.com/settings/keys"
+          echo "- OAuth Apps: https://github.com/settings/applications"
+          echo "- Repo Security: https://github.com/${{ github.repository }}/settings/security_analysis"
+          echo ""
