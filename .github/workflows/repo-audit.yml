@@ -1,0 +1,164 @@
+name: Repository Security Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - '.github/workflows/**'
+      - 'tools/**'
+      - 'scripts/**'
+  push:
+    branches: [ "main" ]
+    paths:
+      - '.github/workflows/**'
+      - 'tools/**'
+      - 'scripts/**'
+
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+
+jobs:
+  security-audit:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for comprehensive secret scanning
+      
+      - name: Set up environment
+        run: |
+          echo "🔧 Setting up audit environment..."
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq > /dev/null 2>&1
+          
+      - name: Run security audit
+        id: audit
+        run: |
+          echo "🔍 Running repository security audit..."
+          chmod +x tools/repo-audit.sh
+          
+          # Run audit (capture exit code)
+          set +e
+          ./tools/repo-audit.sh
+          AUDIT_EXIT_CODE=$?
+          set -e
+          
+          echo "audit_exit_code=$AUDIT_EXIT_CODE" >> $GITHUB_OUTPUT
+          
+          # Display report summary
+          if [ -f repo-audit-report.txt ]; then
+            echo "📄 Audit Report Summary:"
+            tail -20 repo-audit-report.txt
+          fi
+          
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repo-audit-report
+          path: repo-audit-report.txt
+          retention-days: 90
+          
+      - name: Check for critical findings
+        if: steps.audit.outputs.audit_exit_code == '1'
+        run: |
+          echo "::error::🚨 CRITICAL SECURITY ISSUES FOUND!"
+          echo "::error::Review the audit report artifact for details."
+          echo "::error::URGENT: Rotate any exposed credentials immediately!"
+          
+          # Extract critical findings
+          if [ -f repo-audit-report.txt ]; then
+            echo "::group::Critical Findings"
+            grep -A 2 "\[CRITICAL\]" repo-audit-report.txt || echo "See full report for details"
+            echo "::endgroup::"
+          fi
+          
+          exit 1
+          
+      - name: Post audit summary
+        if: always()
+        run: |
+          echo "### 🛡️ Security Audit Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f repo-audit-report.txt ]; then
+            # Extract summary section
+            sed -n '/^Audit Summary$/,/^End of Report$/p' repo-audit-report.txt >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Audit report not generated" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📥 [Download full report](../artifacts)" >> $GITHUB_STEP_SUMMARY
+          
+      - name: Create issue for critical findings
+        if: steps.audit.outputs.audit_exit_code == '1' && github.event_name != 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('repo-audit-report.txt', 'utf8');
+            
+            // Extract critical findings
+            const criticalLines = report.split('\n').filter(line => 
+              line.includes('[CRITICAL]')
+            );
+            
+            const issueBody = `## 🚨 Critical Security Issues Detected
+            
+            The automated repository security audit has detected **critical security issues** that require immediate attention.
+            
+            ### Critical Findings
+            \`\`\`
+            ${criticalLines.slice(0, 10).join('\n')}
+            \`\`\`
+            
+            ### Immediate Actions Required
+            1. Review the [full audit report](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+            2. **Rotate any exposed credentials immediately**
+            3. Remove secrets from git history if found
+            4. Update CI/CD workflows to remove suspicious patterns
+            
+            ### Workflow Run
+            - Run: [#${context.runId}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})
+            - Triggered by: ${context.eventName}
+            - Timestamp: ${new Date().toISOString()}
+            
+            ---
+            *This issue was automatically created by the Repository Security Audit workflow.*
+            `;
+            
+            // Check if there's already an open security audit issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'security-audit',
+              state: 'open'
+            });
+            
+            if (issues.data.length === 0) {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '🚨 Critical Security Issues Detected in Repository Audit',
+                body: issueBody,
+                labels: ['security-audit', 'critical', 'urgent']
+              });
+            } else {
+              // Comment on existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues.data[0].number,
+                body: `### New Critical Findings Detected\n\n${issueBody}`
+              });
+            }
